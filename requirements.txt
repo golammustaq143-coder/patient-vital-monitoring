@@ -2,7 +2,3 @@ streamlit
 pandas
 numpy
 plotly
-import streamlit
-import pandas
-import numpy
-import plotly
