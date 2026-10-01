@@ -82,11 +82,22 @@ def spo2_interpret(v):
     return "LOW", "Low Oxygen Level"
 
 def bp_interpret(s, d):
-    if s <= 90 or d <= 60: return "LOW", "Low Blood Pressure"
-    if s < 120 and d < 80: return "NORMAL", "Normal Blood Pressure"
-    if 120 <= s <= 129 and d < 80: return "HIGH", "Elevated Blood Pressure"
-    return "HIGH", "High Blood Pressure"
+    # 120/80 mmHg is treated as NORMAL in this prototype.
 
+    if s < 90 or d < 60:
+        return "LOW", "Low Blood Pressure"
+
+    elif s <= 120 and d <= 80:
+        return "NORMAL", "Normal Blood Pressure"
+
+    elif 121 <= s <= 129 and d < 80:
+        return "HIGH", "Elevated Blood Pressure"
+
+    elif s >= 130 or d >= 80:
+        return "HIGH", "High Blood Pressure"
+
+    else:
+        return "NORMAL", "Normal Blood Pressure"
 def rr_interpret(v):
     if v < 12: return "LOW", "Low Respiratory Rate"
     if v <= 18: return "NORMAL", "Normal Respiratory Rate"
