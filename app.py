@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import requests
 
 # ============================================================
 # PAGE CONFIGURATION
@@ -188,7 +189,33 @@ def classify_status(risk):
 
     else:
         return "CRITICAL"
+# ============================================================
+# TELEGRAM ALERT SYSTEM
+# ============================================================
 
+def send_telegram_message(message):
+
+    try:
+        bot_token = st.secrets["TELEGRAM_BOT_TOKEN"]
+        chat_id = st.secrets["TELEGRAM_CHAT_ID"]
+
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+
+        payload = {
+            "chat_id": chat_id,
+            "text": message
+        }
+
+        response = requests.post(
+            url,
+            data=payload,
+            timeout=10
+        )
+
+        return response.ok
+
+    except Exception:
+        return False
 # ============================================================
 # SIMULATION SCENARIO
 # ============================================================
@@ -358,6 +385,74 @@ data = pd.DataFrame({
     "Risk Score": risk_scores,
     "Status": statuses
 })
+# ============================================================
+# AUTOMATIC PATIENT STATUS ALERT
+# ============================================================
+
+# Find the first transition from NORMAL to an abnormal state
+abnormal_indices = np.where(
+    data["Status"].isin(["WARNING", "CRITICAL"])
+)[0]
+
+if len(abnormal_indices) > 0:
+
+    alert_index = int(abnormal_indices[0])
+
+    alert_status = data["Status"].iloc[alert_index]
+    alert_time = int(data["Time (min)"].iloc[alert_index])
+
+    alert_temp = data["Temperature (°C)"].iloc[alert_index]
+    alert_hr = data["Heart Rate (BPM)"].iloc[alert_index]
+    alert_spo2 = data["SpO₂ (%)"].iloc[alert_index]
+    alert_sys = data["Systolic BP"].iloc[alert_index]
+    alert_dia = data["Diastolic BP"].iloc[alert_index]
+    alert_rr = data["Respiratory Rate"].iloc[alert_index]
+    alert_risk = data["Risk Score"].iloc[alert_index]
+
+    # Prevent duplicate notifications during Streamlit reruns
+    alert_key = f"{scenario}_{alert_status}_{alert_time}"
+
+    if "last_alert_key" not in st.session_state:
+        st.session_state.last_alert_key = None
+
+    if st.session_state.last_alert_key != alert_key:
+
+        if alert_status == "WARNING":
+
+            message = (
+                "🟡 PATIENT STATUS ALERT\n\n"
+                "Patient ID: P001\n"
+                "Status: NORMAL → WARNING\n\n"
+                f"Time: {alert_time} min\n"
+                f"Risk Score: {alert_risk:.2f}\n\n"
+                f"Temperature: {alert_temp:.1f} °C\n"
+                f"Heart Rate: {alert_hr:.0f} BPM\n"
+                f"SpO₂: {alert_spo2:.0f}%\n"
+                f"Blood Pressure: {alert_sys:.0f}/{alert_dia:.0f} mmHg\n"
+                f"Respiratory Rate: {alert_rr:.0f}/min\n\n"
+                "Please review the patient monitoring status."
+            )
+
+        else:
+
+            message = (
+                "🔴 CRITICAL PATIENT ALERT\n\n"
+                "Patient ID: P001\n"
+                "Status: NORMAL → CRITICAL\n\n"
+                f"Time: {alert_time} min\n"
+                f"Risk Score: {alert_risk:.2f}\n\n"
+                f"Temperature: {alert_temp:.1f} °C\n"
+                f"Heart Rate: {alert_hr:.0f} BPM\n"
+                f"SpO₂: {alert_spo2:.0f}%\n"
+                f"Blood Pressure: {alert_sys:.0f}/{alert_dia:.0f} mmHg\n"
+                f"Respiratory Rate: {alert_rr:.0f}/min\n\n"
+                "Immediate review is recommended."
+            )
+
+        success = send_telegram_message(message)
+
+        if success:
+            st.session_state.last_alert_key = alert_key
 # ============================================================
 # MODEL COMPARISON
 # ============================================================
