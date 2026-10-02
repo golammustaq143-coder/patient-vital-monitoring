@@ -1,0 +1,12 @@
+{
+    "heart_rate": 74,
+    "spo2": 98,
+    "systolic_bp": 120.7,
+    "temperature_c": 38.69,
+    "diastolic_bp": 80.5,
+    "respiratory_rate": 20.2,
+    "panic": false,
+    "wokwi_status": "CRITICAL",
+    "patient_id": "BED-04",
+    "temperature_f": 101.6
+}

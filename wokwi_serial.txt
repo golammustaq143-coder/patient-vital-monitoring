@@ -1,0 +1,7 @@
+your_project/
+│
+├── app_manual_and_simulation_final.py
+├── main.py                  ← Wokwi-এর জন্য
+├── wokwi_bridge.py          ← নতুন
+├── wokwi_serial.txt         ← নতুন
+└── WOKWI_DATA:{"patient_id":"BED-04","temperature_f":98.6,"temperature_c":37.0,"heart_rate":75,"spo2":98,"systolic_bp":120.0,"diastolic_bp":80.0,"respiratory_rate":20.0,"panic":false,"wokwi_status":"NORMAL"}
