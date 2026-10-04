@@ -220,7 +220,7 @@ if "patient_history" not in st.session_state:
 if patient_id not in st.session_state.patient_history:
     st.session_state.patient_history[patient_id] = []
 
-elif mode == "Wokwi ESP32":
+if mode == "Wokwi ESP32":
 
     st.subheader("📡 Wokwi ESP32 Live Patient Monitoring")
 
@@ -233,11 +233,15 @@ elif mode == "Wokwi ESP32":
         )
         st.stop()
 
-    # -----------------------------
-    # Read Wokwi sensor values
-    # -----------------------------
+    # ============================================================
+    # READ WOKWI SENSOR DATA
+    # ============================================================
 
     patient_id = data.get("patient_id", "BED-01")
+
+    # Create history for Wokwi patient
+    if patient_id not in st.session_state.patient_history:
+        st.session_state.patient_history[patient_id] = []
 
     tf = float(data.get("temperature_f", 98.6))
     hr = float(data.get("heart_rate", 75))
@@ -250,15 +254,15 @@ elif mode == "Wokwi ESP32":
 
     panic = bool(data.get("panic", False))
 
-    # -----------------------------
-    # Fahrenheit → Celsius
-    # -----------------------------
+    # ============================================================
+    # TEMPERATURE CONVERSION
+    # ============================================================
 
     tc = (tf - 32) * 5 / 9
 
-    # -----------------------------
-    # Existing analysis pipeline
-    # -----------------------------
+    # ============================================================
+    # EXISTING ANALYSIS PIPELINE
+    # ============================================================
 
     info = interpretations(
         tf,
@@ -269,7 +273,13 @@ elif mode == "Wokwi ESP32":
         rr
     )
 
-    risk = calculate_risk(
+    # ============================================================
+    # WOKWI-SPECIFIC BP RISK ANALYSIS
+    # Manual Input logic remains unchanged
+    # ============================================================
+
+    # Existing multi-parameter risk calculation
+    base_risk = calculate_risk(
         tc,
         hr,
         spo2,
@@ -278,65 +288,377 @@ elif mode == "Wokwi ESP32":
         rr
     )
 
+    # ------------------------------------------------------------
+    # Wokwi BP classification
+    # ------------------------------------------------------------
+
+    if systolic < 90 or diastolic < 60:
+
+        # Low BP / Hypotension
+        bp_risk = 0.60
+
+    elif systolic < 120 and diastolic < 80:
+
+        # Normal BP
+        bp_risk = 0.00
+
+    elif 120 <= systolic <= 129 and diastolic < 80:
+
+        # Elevated BP
+        bp_risk = 0.15
+
+    elif 130 <= systolic <= 139 or 80 <= diastolic <= 89:
+
+        # Stage 1 High BP
+        bp_risk = 0.35
+
+    elif systolic >= 140 or diastolic >= 90:
+
+        # Stage 2 High BP
+        bp_risk = 0.60
+
+    else:
+
+        bp_risk = 0.00
+
+
+    # ------------------------------------------------------------
+    # Replace the old BP contribution
+    # ------------------------------------------------------------
+
+    old_bp_contribution = (
+        W_BP * blood_pressure_score(
+            systolic,
+            diastolic
+        )
+    )
+
+    new_bp_contribution = W_BP * bp_risk
+
+    risk = base_risk - old_bp_contribution + new_bp_contribution
+
+    # ------------------------------------------------------------
+    # Final Wokwi patient status
+    # ------------------------------------------------------------
+
     status = classify_status(risk)
 
     # Panic button = emergency condition
     if panic:
         status = "CRITICAL"
 
-    # -----------------------------
-    # Display sensor values
-    # -----------------------------
+    # ============================================================
+    # SAVE WOKWI MEASUREMENT TO PATIENT HISTORY
+    # ============================================================
+
+    current_measurement = {
+        "Time": datetime.now().strftime("%H:%M:%S"),
+        "Temperature (°F)": float(tf),
+        "Temperature (°C)": float(tc),
+        "Heart Rate (BPM)": float(hr),
+        "SpO₂ (%)": float(spo2),
+        "Systolic BP": float(systolic),
+        "Diastolic BP": float(diastolic),
+        "Respiratory Rate": float(rr),
+        "Risk Score": float(risk),
+        "Status": status
+    }
+
+    history = st.session_state.patient_history[patient_id]
+
+    # Prevent duplicate rows during Streamlit reruns
+    measurement_signature = (
+        current_measurement["Temperature (°F)"],
+        current_measurement["Heart Rate (BPM)"],
+        current_measurement["SpO₂ (%)"],
+        current_measurement["Systolic BP"],
+        current_measurement["Diastolic BP"],
+        current_measurement["Respiratory Rate"],
+        current_measurement["Status"]
+    )
+
+    if history:
+
+        last = history[-1]
+
+        last_signature = (
+            last["Temperature (°F)"],
+            last["Heart Rate (BPM)"],
+            last["SpO₂ (%)"],
+            last["Systolic BP"],
+            last["Diastolic BP"],
+            last["Respiratory Rate"],
+            last["Status"]
+        )
+
+    else:
+        last_signature = None
+
+    if measurement_signature != last_signature:
+        history.append(current_measurement)
+
+    # ============================================================
+    # LIVE WOKWI SENSOR DATA
+    # ============================================================
 
     st.markdown("### 🩺 Live Wokwi Sensor Data")
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.metric("Temperature", f"{tf:.1f} °F")
+        st.metric(
+            "Temperature",
+            f"{tf:.1f} °F"
+        )
 
     with col2:
-        st.metric("Heart Rate", f"{hr:.0f} BPM")
+        st.metric(
+            "Heart Rate",
+            f"{hr:.0f} BPM"
+        )
 
     with col3:
-        st.metric("SpO₂", f"{spo2:.0f} %")
+        st.metric(
+            "SpO₂",
+            f"{spo2:.0f} %"
+        )
 
     col4, col5, col6 = st.columns(3)
 
     with col4:
-        st.metric("Blood Pressure", f"{systolic:.0f}/{diastolic:.0f} mmHg")
+        st.metric(
+            "Blood Pressure",
+            f"{systolic:.0f}/{diastolic:.0f} mmHg"
+        )
 
     with col5:
-        st.metric("Respiratory Rate", f"{rr:.0f} /min")
+        st.metric(
+            "Respiratory Rate",
+            f"{rr:.0f} /min"
+        )
 
     with col6:
-        st.metric("Risk Score", f"{risk:.3f}")
+        st.metric(
+            "Risk Score",
+            f"{risk:.3f}"
+        )
+
+    # ============================================================
+    # CURRENT PATIENT STATUS
+    # ============================================================
 
     st.markdown("---")
 
     st.subheader("Current Patient Status")
 
     if status == "NORMAL":
+
         st.success("🟢 NORMAL")
 
     elif status == "WARNING":
+
         st.warning("🟡 WARNING")
 
     else:
+
         st.error("🔴 CRITICAL")
 
     if panic:
         st.error("🚨 PANIC BUTTON ACTIVATED")
 
-    # -----------------------------
-    # Clinical interpretation
-    # -----------------------------
+    # ============================================================
+    # PARAMETER INTERPRETATION
+    # ============================================================
 
     st.markdown("### 📋 Parameter Interpretation")
 
     for key, value in info.items():
-        st.write(f"**{key}:** {value}")
-if mode == "Manual Patient Input":
+
+        st.write(
+            f"**{key}:** {value}"
+        )
+
+    # ============================================================
+    # WOKWI PATIENT HISTORY
+    # ============================================================
+
+    st.markdown("---")
+
+    st.subheader("📜 Patient History")
+
+    history_data = pd.DataFrame(history)
+
+    if not history_data.empty:
+
+        st.dataframe(
+            history_data,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    else:
+
+        st.info(
+            "No patient history available yet."
+        )
+        # ============================================================
+    # WOKWI PATIENT TREND ANALYSIS
+    # ============================================================
+
+    st.markdown("---")
+    st.subheader("📊 Patient Vital Trends")
+
+    if len(history) >= 2:
+
+        history_df = pd.DataFrame(history)
+
+        # --------------------------------------------------------
+        # Temperature Trend
+        # --------------------------------------------------------
+
+        st.markdown("### 🌡 Temperature Trend")
+
+        st.line_chart(
+            history_df.set_index("Time")[
+                ["Temperature (°F)"]
+            ],
+            use_container_width=True
+        )
+
+        # --------------------------------------------------------
+        # Heart Rate Trend
+        # --------------------------------------------------------
+
+        st.markdown("### ❤️ Heart Rate Trend")
+
+        st.line_chart(
+            history_df.set_index("Time")[
+                ["Heart Rate (BPM)"]
+            ],
+            use_container_width=True
+        )
+
+        # --------------------------------------------------------
+        # SpO₂ Trend
+        # --------------------------------------------------------
+
+        st.markdown("### 🫁 SpO₂ Trend")
+
+        st.line_chart(
+            history_df.set_index("Time")[
+                ["SpO₂ (%)"]
+            ],
+            use_container_width=True
+        )
+
+        # --------------------------------------------------------
+        # Blood Pressure Trend
+        # --------------------------------------------------------
+
+        st.markdown("### 🩸 Blood Pressure Trend")
+
+        bp_df = history_df.set_index("Time")[
+            ["Systolic BP", "Diastolic BP"]
+        ]
+
+        st.line_chart(
+            bp_df,
+            use_container_width=True
+        )
+
+        # --------------------------------------------------------
+        # Respiratory Rate Trend
+        # --------------------------------------------------------
+
+        st.markdown("### 🌬 Respiratory Rate Trend")
+
+        st.line_chart(
+            history_df.set_index("Time")[
+                ["Respiratory Rate"]
+            ],
+            use_container_width=True
+        )
+
+        # --------------------------------------------------------
+        # Risk Score Trend
+        # --------------------------------------------------------
+
+        st.markdown("### ⚠️ Risk Score Trend")
+
+        st.line_chart(
+            history_df.set_index("Time")[
+                ["Risk Score"]
+            ],
+            use_container_width=True
+        )
+
+        # --------------------------------------------------------
+        # Status History
+        # --------------------------------------------------------
+
+        st.markdown("### 🚦 Patient Status History")
+
+        status_df = history_df[
+            ["Time", "Risk Score", "Status"]
+        ].copy()
+
+        st.dataframe(
+            status_df,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # --------------------------------------------------------
+        # Latest Measurement Summary
+        # --------------------------------------------------------
+
+        st.markdown("### 🩺 Latest Measurement")
+
+        latest = history_df.iloc[-1]
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            st.metric(
+                "Latest Heart Rate",
+                f"{latest['Heart Rate (BPM)']:.0f} BPM"
+            )
+
+        with c2:
+            st.metric(
+                "Latest SpO₂",
+                f"{latest['SpO₂ (%)']:.0f}%"
+            )
+
+        with c3:
+            st.metric(
+                "Latest Risk Score",
+                f"{latest['Risk Score']:.3f}"
+            )
+
+        # --------------------------------------------------------
+        # Abnormal Measurement Count
+        # --------------------------------------------------------
+
+        abnormal_count = len(
+            history_df[
+                history_df["Status"] != "NORMAL"
+            ]
+        )
+
+        st.info(
+            f"Total measurements: {len(history_df)} | "
+            f"Abnormal measurements: {abnormal_count}"
+        )
+
+    else:
+
+        st.info(
+            "At least 2 measurements are required "
+            "to display patient trends."
+        )
+    
+elif mode == "Manual Patient Input":
     st.subheader("🧑‍⚕️ Manual Patient Vital Input")
     st.info("Enter measured values. Analysis, risk score and status update automatically; no Analyze button is required.")
 
