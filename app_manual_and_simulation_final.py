@@ -348,6 +348,41 @@ if mode == "Wokwi ESP32":
         status = "CRITICAL"
 
     # ============================================================
+    # WOKWI TELEGRAM ALERT
+    # ============================================================
+
+    wokwi_alert_key = (
+        f"{patient_id}|{tf:.1f}|{hr:.0f}|{spo2:.0f}|"
+        f"{systolic:.0f}|{diastolic:.0f}|{rr:.0f}|{status}"
+    )
+
+    if "wokwi_alerts" not in st.session_state:
+        st.session_state.wokwi_alerts = set()
+
+    if (
+        status in ("WARNING", "CRITICAL")
+        and wokwi_alert_key not in st.session_state.wokwi_alerts
+    ):
+        if send_alert(
+            patient_id,
+            "Wokwi ESP32",
+            status,
+            risk,
+            tf,
+            hr,
+            spo2,
+            systolic,
+            diastolic,
+            rr,
+            info
+        ):
+            st.session_state.wokwi_alerts.add(wokwi_alert_key)
+            st.toast(
+                "Wokwi Telegram alert sent successfully.",
+                icon="📲"
+            )
+
+    # ============================================================
     # SAVE WOKWI MEASUREMENT TO PATIENT HISTORY
     # ============================================================
 
