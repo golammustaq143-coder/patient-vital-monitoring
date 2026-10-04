@@ -58,6 +58,86 @@ def respiratory_score(v):
     return 0.6
 def read_wokwi_data():
     """
+    Read the latest Wokwi sensor data directly from Supabase REST API.
+    Falls back to local wokwi_data.json if Supabase is unavailable.
+    """
+
+    # ============================================================
+    # 1. READ DIRECTLY FROM SUPABASE REST API
+    # ============================================================
+
+    try:
+        supabase_url = st.secrets["SUPABASE_URL"]
+        supabase_key = st.secrets["SUPABASE_ANON_KEY"]
+
+        api_url = (
+            f"{supabase_url}/rest/v1/wokwi_vitals"
+            "?select=*"
+            "&order=created_at.desc"
+            "&limit=1"
+        )
+
+        headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": "application/json"
+        }
+
+        response = requests.get(
+            api_url,
+            headers=headers,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        rows = response.json()
+
+        if rows:
+            row = rows[0]
+
+            return {
+                "patient_id": row.get("patient_id", "P001"),
+                "temperature_f": row.get("temperature_f", 98.6),
+                "temperature_c": row.get("temperature_c", 37.0),
+                "heart_rate": row.get("heart_rate", 75),
+                "spo2": row.get("spo2", 98),
+                "systolic_bp": row.get("systolic_bp", 120),
+                "diastolic_bp": row.get("diastolic_bp", 80),
+                "respiratory_rate": row.get("respiratory_rate", 18),
+                "panic": row.get("panic", False),
+                "wokwi_status": row.get("wokwi_status", "UNKNOWN")
+            }
+
+        st.warning("⚠️ Supabase connected, but no Wokwi data was found.")
+
+    except Exception as e:
+
+        st.error(
+            f"❌ Supabase REST API error: {type(e).__name__}: {e}"
+        )
+
+    # ============================================================
+    # 2. LOCAL FALLBACK
+    # ============================================================
+
+    try:
+        with open(
+            "wokwi_data.json",
+            "r",
+            encoding="utf-8"
+        ) as f:
+            return json.load(f)
+
+    except FileNotFoundError:
+        return None
+
+    except json.JSONDecodeError:
+        return None
+
+    except Exception:
+        return None
+    """
     Read the latest Wokwi sensor data from Supabase.
     Falls back to local wokwi_data.json if Supabase is unavailable.
     """
@@ -292,7 +372,7 @@ if mode == "Wokwi ESP32":
     st.subheader("📡 Wokwi ESP32 Live Patient Monitoring")
 
     data = read_wokwi_data()
-    st.write("🔍 Supabase Debug:", data)
+
     if data is None:
         st.warning(
             "No Wokwi data available. "
