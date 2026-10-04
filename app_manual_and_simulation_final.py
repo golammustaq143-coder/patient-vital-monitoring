@@ -63,11 +63,20 @@ def read_wokwi_data():
     """
 
     # ============================================================
-    # 1. TRY SUPABASE FIRST
+    # 1. TRY SUPABASE
     # ============================================================
 
     try:
         from supabase import create_client
+
+        # Check Streamlit Cloud secrets
+        if "SUPABASE_URL" not in st.secrets:
+            st.error("❌ SUPABASE_URL is missing from Streamlit Secrets.")
+            return None
+
+        if "SUPABASE_ANON_KEY" not in st.secrets:
+            st.error("❌ SUPABASE_ANON_KEY is missing from Streamlit Secrets.")
+            return None
 
         supabase_url = st.secrets["SUPABASE_URL"]
         supabase_key = st.secrets["SUPABASE_ANON_KEY"]
@@ -89,64 +98,26 @@ def read_wokwi_data():
         if response.data:
             row = response.data[0]
 
-            # Convert Supabase row into the same
-            # structure used by the existing Wokwi code.
-
             return {
-                "patient_id": row.get(
-                    "patient_id",
-                    "P001"
-                ),
-
-                "temperature_f": row.get(
-                    "temperature_f",
-                    98.6
-                ),
-
-                "temperature_c": row.get(
-                    "temperature_c",
-                    37.0
-                ),
-
-                "heart_rate": row.get(
-                    "heart_rate",
-                    75
-                ),
-
-                "spo2": row.get(
-                    "spo2",
-                    98
-                ),
-
-                "systolic_bp": row.get(
-                    "systolic_bp",
-                    120
-                ),
-
-                "diastolic_bp": row.get(
-                    "diastolic_bp",
-                    80
-                ),
-
-                "respiratory_rate": row.get(
-                    "respiratory_rate",
-                    18
-                ),
-
-                "panic": row.get(
-                    "panic",
-                    False
-                ),
-
-                "wokwi_status": row.get(
-                    "wokwi_status",
-                    "UNKNOWN"
-                )
+                "patient_id": row.get("patient_id", "P001"),
+                "temperature_f": row.get("temperature_f", 98.6),
+                "temperature_c": row.get("temperature_c", 37.0),
+                "heart_rate": row.get("heart_rate", 75),
+                "spo2": row.get("spo2", 98),
+                "systolic_bp": row.get("systolic_bp", 120),
+                "diastolic_bp": row.get("diastolic_bp", 80),
+                "respiratory_rate": row.get("respiratory_rate", 18),
+                "panic": row.get("panic", False),
+                "wokwi_status": row.get("wokwi_status", "UNKNOWN")
             }
 
-    except Exception:
-        pass
+        st.warning("⚠️ Supabase connected, but no data was returned.")
 
+    except Exception as e:
+
+        st.error(
+            f"❌ Supabase connection/read error: {type(e).__name__}: {e}"
+        )
 
     # ============================================================
     # 2. LOCAL FALLBACK
@@ -321,7 +292,7 @@ if mode == "Wokwi ESP32":
     st.subheader("📡 Wokwi ESP32 Live Patient Monitoring")
 
     data = read_wokwi_data()
-
+    st.write("🔍 Supabase Debug:", data)
     if data is None:
         st.warning(
             "No Wokwi data available. "
