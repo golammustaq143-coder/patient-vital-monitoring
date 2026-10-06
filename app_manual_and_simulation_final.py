@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import requests
 import json 
 from datetime import datetime
-from streamlit_autorefresh import st_autorefresh
+
 st.set_page_config(page_title="Patient Vital Monitoring System", page_icon="❤️", layout="wide")
 st.title("❤️ Multi-Parameter Patient Vital Monitoring System")
 st.write("Multi-parameter physiological monitoring and early warning framework with manual input and simulation modes.")
@@ -371,7 +371,7 @@ if mode == "Wokwi ESP32":
     st_autorefresh(
         interval=2000,
         key="wokwi_live_refresh"
-    )
+    )mpremote connect port:rfc2217://localhost:4000 fs cp main.py :main.py
     
 if mode == "Wokwi ESP32":
 
