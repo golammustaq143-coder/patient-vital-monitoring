@@ -5,8 +5,7 @@ import plotly.graph_objects as go
 import requests
 import json 
 from datetime import datetime
-# TEMPORARY SUPABASE SECRETS TEST
-st.write("Available secret keys:", list(st.secrets.keys()))
+
 st.set_page_config(page_title="Patient Vital Monitoring System", page_icon="❤️", layout="wide")
 st.title("❤️ Multi-Parameter Patient Vital Monitoring System")
 st.write("Multi-parameter physiological monitoring and early warning framework with manual input and simulation modes.")
